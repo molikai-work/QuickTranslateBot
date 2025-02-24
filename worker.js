@@ -1,6 +1,6 @@
 // 程序基本信息
 const programName = "Quick Translate Bot";
-const programVersion = "1.0.2";
+const programVersion = "1.0.3";
 
 // 处理 HTTP 请求
 export default {
@@ -15,7 +15,8 @@ export default {
 
       return new Response(null, { status: 404 });
     } catch (error) {
-      return handleError(error);
+      console.error("Error:", error);
+      return new Response(null, { status: 500 });
     }
   }
 };
@@ -121,7 +122,8 @@ async function handleTelegramWebhook(request, env) {
     const translatedText = await fetchTranslation(messageText);
     return sendTelegramMessage(chatId, translatedText, message_id, telegramBotToken);
   } catch (error) {
-    return handleError(error);
+    console.error("Error:", error);
+    return new Response(null, { status: 500 });
   }
 }
 
@@ -154,47 +156,57 @@ async function fetchTranslation(text) {
   const targetLanguage = /[\p{Script=Han}]/u.test(text.trim()) ? "en" : "zh-CN";
   const translateUrl = `${googleTranslateApiUrl}${targetLanguage}&dt=t&q=${encodeURIComponent(text)}`;
 
-  const translateResponse = await fetch(translateUrl);
-  if (!translateResponse.ok) throw new Error("Failed to fetch translation");
+  try {
+    const translateResponse = await fetch(translateUrl);
+    if (!translateResponse.ok) throw new Error("Failed to fetch translation");
 
-  const translateData = await translateResponse.json();
-  return translateData[0].map(item => item[0]).join(""); // 返回翻译结果
+    const translateData = await translateResponse.json();
+    return translateData[0].map(item => item[0]).join(""); // 返回翻译结果
+  } catch (error) {
+    console.error("Error:", error);
+    // 如果请求失败，则返回错误提示
+    return "抱歉，第三方翻译服务不可达，请稍后再试。";
+  }
 }
 
 // 发送文本消息
 async function sendTelegramMessage(chatId, text, replyToMessageId, token) {
-  const sendMessageUrl = `https://api.telegram.org/bot${token}/sendMessage`;
-  const messagePayload = {
-    chat_id: chatId, text,
-    reply_to_message_id: replyToMessageId,
-    disable_web_page_preview: "true",
-  };
+  try {
+    const sendMessageUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+    const messagePayload = {
+      chat_id: chatId, text,
+      reply_to_message_id: replyToMessageId,
+      disable_web_page_preview: "true",
+    };
 
-  await fetch(sendMessageUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(messagePayload)
-  });
+    await fetch(sendMessageUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(messagePayload)
+    });
 
-  return new Response(null, { status: 200 });
+    return new Response(null, { status: 200 });
+  } catch (error) {
+    console.error("Error:", error);
+    return new Response(null, { status: 500 });
+  }
 }
 
 // 发送贴纸消息
 async function sendTelegramSticker(chatId, stickerId, replyToMessageId, token) {
-  const sendStickerUrl = `https://api.telegram.org/bot${token}/sendSticker`;
-  const stickerPayload = { chat_id: chatId, sticker: stickerId, reply_to_message_id: replyToMessageId };
+  try {
+    const sendStickerUrl = `https://api.telegram.org/bot${token}/sendSticker`;
+    const stickerPayload = { chat_id: chatId, sticker: stickerId, reply_to_message_id: replyToMessageId };
 
-  await fetch(sendStickerUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(stickerPayload)
-  });
+    await fetch(sendStickerUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(stickerPayload)
+    });
 
-  return new Response(null, { status: 200 });
-}
-
-// 错误处理函数
-function handleError(error) {
-  console.error("Error:", error);
-  return new Response(null, { status: 500 });
+    return new Response(null, { status: 200 });
+  } catch (error) {
+    console.error("Error:", error);
+    return new Response(null, { status: 500 });
+  }
 }
