@@ -1,6 +1,6 @@
 // 程序基本信息
 const programName = "Quick Translate Bot";
-const programVersion = "1.1.0";
+const programVersion = "1.1.1";
 
 // 处理 HTTP 请求
 export default {
@@ -102,20 +102,42 @@ async function handleTelegramWebhook(request, env) {
       return sendTelegramMessage(chatId, "抱歉，目前我不支持处理图片、视频、音频或文件等媒体类型。只支持对文本进行翻译。", message_id, telegramBotToken);
     }
 
-    // 如果没有 text
+    // 如果没有 messageText
     if (!messageText) {
-      return sendTelegramSticker(chatId, "请您发送需要翻译的文本。", message_id, telegramBotToken);
+      return sendTelegramMessage(chatId, "请发送您需要翻译的文本。", message_id, telegramBotToken);
     }
 
     // 处理开始命令
     if (messageText === "/start") {
-      return sendTelegramMessage(chatId, `好！让我们开始翻译，谢谢使用 ${programName} v${programVersion}！\n请您直接的将要翻译的文本发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。`, message_id, telegramBotToken);
+      return sendTelegramMessage(chatId, `好！让我们开始翻译，谢谢使用 ${programName} v${programVersion}！\n请您直接的将要翻译的文本发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。\n\n您也可以使用 /to <目标语言> <文本> 命令快捷指定目标语言进行翻译。\n使用 /translate <源语言> <目标语言> <文本> 命令指定源语言与目标语言进行翻译。\n\n使用 /report 查看程序详细信息。`, message_id, telegramBotToken);
     }
 
     // 处理报告命令
     if (messageText === "/report") {
       const serverTime = new Date().toISOString();
       return sendTelegramMessage(chatId, `程序名：${programName}\n版本：${programVersion}\n服务器时间：${serverTime}\n\n用户名：@${username}\n用户ID：${userId}\n聊天类型：${chatType}\n\n作者：molikai-work\nGitHub：https://github.com/molikai-work/QuickTranslateBot`, message_id, telegramBotToken);
+    }
+
+    // 处理 /to 命令
+    const toCommandRegex = /^\/to\s+([a-zA-Z-]+)\s+(.*)/;
+    const matchToCommand = messageText.match(toCommandRegex);
+    if (matchToCommand) {
+      const [_, targetLang, userMessageText] = matchToCommand;
+
+      // 设置目标语言为 userMessageText 并自动检测源语言
+      const translatedText = await fetchTranslation(userMessageText, 'auto', targetLang);
+      return sendTelegramMessage(chatId, translatedText, message_id, telegramBotToken);
+    }
+
+    // 处理翻译命令
+    const translateCommandRegex = /^\/translate\s+([a-zA-Z-]+)\s+([a-zA-Z-]+)\s+(.*)/;
+    const matchTranslateeCommand = messageText.match(translateCommandRegex);
+    if (matchTranslateeCommand) {
+      const [_, sourceLang, targetLang, userMessageText] = matchTranslateeCommand;
+
+      // 调用翻译功能，并指定源语言和目标语言
+      const translatedText = await fetchTranslation(userMessageText, sourceLang, targetLang);
+      return sendTelegramMessage(chatId, translatedText, message_id, telegramBotToken);
     }
 
     // 处理翻译请求
@@ -149,12 +171,17 @@ async function handleGroupMessageTranslation(messageText, chatId, messageId, tel
 }
 
 // 处理翻译请求
-async function fetchTranslation(text) {
-  const googleTranslateApiUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=";
+async function fetchTranslation(text, sourceLang = null, targetLang = null) {
+  const googleTranslateApiUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=";
 
-  // 根据消息内容判断目标语言（如果是中文则翻译成英文，反之亦然）
-  const targetLanguage = /[\p{Script=Han}]/u.test(text.trim()) ? "en" : "zh-CN";
-  const translateUrl = `${googleTranslateApiUrl}${targetLanguage}&dt=t&q=${encodeURIComponent(text)}`;
+  // 如果没有指定源语言和目标语言，默认进行中英文互译
+  if (!sourceLang || !targetLang) {
+    // 根据消息内容判断目标语言（如果是中文则翻译成英文，反之亦然）
+    sourceLang = /[\p{Script=Han}]/u.test(text.trim()) ? "zh-CN" : "en";
+    targetLang = sourceLang === "zh-CN" ? "en" : "zh-CN";
+  }
+
+  const translateUrl = `${googleTranslateApiUrl}${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
 
   try {
     const translateResponse = await fetch(translateUrl);
@@ -164,7 +191,6 @@ async function fetchTranslation(text) {
     return translateData[0].map(item => item[0]).join(""); // 返回翻译结果
   } catch (error) {
     console.error("Error:", error);
-    // 如果请求失败，则返回错误提示
     return "抱歉，第三方翻译服务不可达，请稍后再试。";
   }
 }
@@ -196,7 +222,10 @@ async function sendTelegramMessage(chatId, text, replyToMessageId, token) {
 async function sendTelegramSticker(chatId, stickerId, replyToMessageId, token) {
   try {
     const sendStickerUrl = `https://api.telegram.org/bot${token}/sendSticker`;
-    const stickerPayload = { chat_id: chatId, sticker: stickerId, reply_to_message_id: replyToMessageId };
+    const stickerPayload = {
+      chat_id: chatId,
+      sticker: stickerId,
+      reply_to_message_id: replyToMessageId };
 
     await fetch(sendStickerUrl, {
       method: "POST",
