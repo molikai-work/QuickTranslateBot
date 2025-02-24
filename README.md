@@ -5,18 +5,9 @@
 
 ## 功能
 - **中英互译**：自动识别文本语言，支持中文和英文互译。
-- **群组支持**：支持在群组中提及机器人并进行翻译，还能识别回复信息。
+- **群组支持**：支持在群组中提及机器人并进行翻译，还支持识别回复的信息。
 
-## 部署要求
-- **Telegram Bot Token**：您需要一个 Telegram 机器人令牌，注册一个机器人并获取 Token。
-- **环境变量**：
-  - `SECRET_TOKEN`：用于验证来自 Telegram 的请求。
-  - `MAX_TIME_DIFF`：最大时间差（单位：秒），用于验证消息时间戳与服务器时间的差异。
-  - `ENABLE_GROUP_FEATURE`：是否启用群组功能（布尔值，`true` 或 `false`）。
-  - `TELEGRAM_BOT_NAME`：Telegram 机器人用户名。
-  - `TELEGRAM_BOT_TOKEN`：Telegram 机器人 Token。
-
-## 安装与部署
+## 部署
 ### 1. 环境准备
 此代码可以在 Cloudflare Workers 的平台上运行。
 
@@ -59,9 +50,6 @@ https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=<YOUR_WORKER_URL
 
 ### 5. 媒体消息
 目前，机器人仅支持翻译文本消息。
-
-### 6. 错误处理
-如果翻译请求失败，机器人会返回一个错误提示：“抱歉，第三方翻译服务不可达，请稍后再试。”
 
 ## 常见问题
 ### 1. 如何修改翻译方向？
