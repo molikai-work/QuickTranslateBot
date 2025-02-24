@@ -1,7 +1,6 @@
 // 程序基本信息
 const programName = "Quick Translate Bot";
-const Version = "1.0.0";
-const DEV_MODE = false; // 开发模式
+const Version = "1.0.1";
 
 // 处理 HTTP 请求
 export default {
@@ -24,6 +23,7 @@ export default {
 // 处理 Telegram 更新消息
 async function handleTelegramUpdate(request, env) {
   const SECRET_TOKEN = env.SECRET_TOKEN;
+  const MAX_TIME_DIFF = 20; // 设置时间差阈值，单位秒
   const ENABLE_GROUP_FEATURE = env.ENABLE_GROUP_FEATURE;
   const TELEGRAM_BOT_NAME = env.TELEGRAM_BOT_NAME;
   const TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN;
@@ -40,9 +40,19 @@ async function handleTelegramUpdate(request, env) {
 
     if (!message) return new Response(null, { status: 200 });
 
-    const { text, chat, message_id, from, entities } = message;
+    const { text, chat, message_id, from, entities, date } = message;
     const { id: chat_id, type: chat_type } = chat;
     const { id: user_id, username = "Unknown" } = from;
+
+    // 计算时间戳
+    const currentTime = Math.floor(Date.now() / 1000); // 当前服务器时间戳
+    const timeDiff = Math.abs(currentTime - date); // 计算时间差
+
+    // 检查信息时间与服务器时间的差值
+    if (timeDiff > MAX_TIME_DIFF) {
+      console.log(`Time difference ${timeDiff} seconds is greater than ${MAX_TIME_DIFF}`);
+      return new Response(null, { status: 200 });
+    }
 
     // 检查聊天类型是否不为私聊
     if (chat_type !== "private") {
@@ -93,7 +103,7 @@ async function handleTelegramUpdate(request, env) {
 
     // 如果没有 text
     if (!text) {
-      return sendSticker(chat_id, "请发送需要翻译的文本。", message_id, TELEGRAM_BOT_TOKEN);
+      return sendSticker(chat_id, "请您发送需要翻译的文本。", message_id, TELEGRAM_BOT_TOKEN);
     }
 
     // 处理开始命令
@@ -172,6 +182,5 @@ async function sendSticker(chat_id, sticker_id, reply_to_message_id, token) {
 // 错误处理函数
 function handleError(error) {
   console.error("Error:", error);
-  const errorMessage = DEV_MODE ? `Error: ${error.message}` : "Internal server error";
-  return new Response(errorMessage, { status: 500 });
+  return new Response(null, { status: 500 });
 }
