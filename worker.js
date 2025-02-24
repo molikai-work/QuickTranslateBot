@@ -1,6 +1,6 @@
 // 程序基本信息
 const programName = "Quick Translate Bot";
-const programVersion = "1.0.3";
+const programVersion = "1.1.0";
 
 // 处理 HTTP 请求
 export default {
@@ -25,8 +25,8 @@ export default {
 async function handleTelegramWebhook(request, env) {
   const secretBotToken = env.SECRET_TOKEN;
   const maxTimeDifference = env.MAX_TIME_DIFF || 20;
-  const isGroupFeatureEnabled = env.ENABLE_GROUP_FEATURE;
-  const telegramBotUsername = env.TELEGRAM_BOT_NAME;
+  const isGroupFeatureEnabled = env.ENABLE_GROUP_FEATURE || false;
+  const telegramBotUsername = env.TELEGRAM_BOT_NAME || null;
   const telegramBotToken = env.TELEGRAM_BOT_TOKEN;
 
   try {
@@ -58,7 +58,7 @@ async function handleTelegramWebhook(request, env) {
     // 检查聊天类型是否不为私聊
     if (chatType !== "private") {
       // 检查是否在群组中提及了机器人
-      if (isGroupFeatureEnabled && messageText && entities) {
+      if (isGroupFeatureEnabled && telegramBotUsername && messageText && entities) {
         const isBotMentioned = entities.some(entity =>
           entity.type === 'mention' &&
           messageText.slice(entity.offset, entity.offset + entity.length) === `@${telegramBotUsername}`
