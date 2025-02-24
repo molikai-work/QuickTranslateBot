@@ -1,16 +1,16 @@
 // 程序基本信息
 const programName = "Quick Translate Bot";
-const Version = "1.0.1";
+const programVersion = "1.0.2";
 
 // 处理 HTTP 请求
 export default {
   async fetch(request, env) {
     try {
-      const url = new URL(request.url);
-      const { pathname } = url;
+      const requestUrl = new URL(request.url);
+      const { pathname } = requestUrl;
 
       if (pathname === "/bot/webhook") {
-        return await handleTelegramUpdate(request, env);
+        return await handleTelegramWebhook(request, env);
       }
 
       return new Response(null, { status: 404 });
@@ -21,69 +21,69 @@ export default {
 };
 
 // 处理 Telegram 更新消息
-async function handleTelegramUpdate(request, env) {
-  const SECRET_TOKEN = env.SECRET_TOKEN;
-  const MAX_TIME_DIFF = 20; // 设置时间差阈值，单位秒
-  const ENABLE_GROUP_FEATURE = env.ENABLE_GROUP_FEATURE;
-  const TELEGRAM_BOT_NAME = env.TELEGRAM_BOT_NAME;
-  const TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN;
+async function handleTelegramWebhook(request, env) {
+  const secretBotToken = env.SECRET_TOKEN;
+  const maxTimeDifference = env.MAX_TIME_DIFF || 20;
+  const isGroupFeatureEnabled = env.ENABLE_GROUP_FEATURE;
+  const telegramBotUsername = env.TELEGRAM_BOT_NAME;
+  const telegramBotToken = env.TELEGRAM_BOT_TOKEN;
 
   try {
     // 验证 Telegram 的 Secret Token
     const receivedToken = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-    if (receivedToken !== SECRET_TOKEN) {
+    if (receivedToken !== secretBotToken) {
       return new Response(null, { status: 403 });
     }
 
-    const update = await request.json();
-    const message = update.message || update.edited_message;
+    const updateData = await request.json();
+    const message = updateData.message || updateData.edited_message;
 
     if (!message) return new Response(null, { status: 200 });
 
-    const { text, chat, message_id, from, entities, date } = message;
-    const { id: chat_id, type: chat_type } = chat;
-    const { id: user_id, username = "Unknown" } = from;
+    const { text: messageText, chat, message_id, from, entities, date, reply_to_message } = message;
+    const { id: chatId, type: chatType } = chat;
+    const { id: userId, username = "Unknown" } = from;
 
     // 计算时间戳
-    const currentTime = Math.floor(Date.now() / 1000); // 当前服务器时间戳
-    const timeDiff = Math.abs(currentTime - date); // 计算时间差
+    const currentTimestamp = Math.floor(Date.now() / 1000); // 当前服务器时间戳
+    const timeDifference = Math.abs(currentTimestamp - date); // 计算时间差
 
     // 检查信息时间与服务器时间的差值
-    if (timeDiff > MAX_TIME_DIFF) {
-      console.log(`Time difference ${timeDiff} seconds is greater than ${MAX_TIME_DIFF}`);
+    if (timeDifference > maxTimeDifference) {
+      console.log(`Time difference ${timeDifference} seconds is greater than ${maxTimeDifference}`);
       return new Response(null, { status: 200 });
     }
 
     // 检查聊天类型是否不为私聊
-    if (chat_type !== "private") {
+    if (chatType !== "private") {
       // 检查是否在群组中提及了机器人
-      if (ENABLE_GROUP_FEATURE && text && entities) {
-        const botMentioned = entities.some(entity =>
+      if (isGroupFeatureEnabled && messageText && entities) {
+        const isBotMentioned = entities.some(entity =>
           entity.type === 'mention' &&
-          text.slice(entity.offset, entity.offset + entity.length) === `@${TELEGRAM_BOT_NAME}`
+          messageText.slice(entity.offset, entity.offset + entity.length) === `@${telegramBotUsername}`
         );
 
-        if (botMentioned) {
-          const messageText = text.slice(entities.find(e => e.type === 'mention').offset + `@${TELEGRAM_BOT_NAME}`.length).trim();
+        if (isBotMentioned) {
+          const userMessageText = messageText.slice(entities.find(e => e.type === 'mention').offset + `@${telegramBotUsername}`.length).trim();
 
-          // 如果@后面没有文本，发送提示信息
-          if (!messageText) {
-            return sendMessage(chat_id, "您好，欢迎提及！请在提及后面输入您需要翻译的文本。", message_id, TELEGRAM_BOT_TOKEN);
+          // 如果@后面没有文本并且不是引用，则发送提示信息
+          if (!userMessageText && !reply_to_message) {
+            return sendTelegramMessage(chatId, "您好，欢迎提及！请在提及后面输入您需要翻译的文本。", message_id, telegramBotToken);
           }
 
           // 处理开始命令
-          if (messageText === "/start") {
-            return sendMessage(chat_id, `\n好！让我们开始翻译，谢谢使用 ${programName} v${Version}！\n请您将要翻译的文本通过提及发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。`, message_id, TELEGRAM_BOT_TOKEN);
+          if (userMessageText === "/start") {
+            return sendTelegramMessage(chatId, `好！让我们开始翻译，谢谢使用 ${programName} v${programVersion}！\n请您将要翻译的文本通过提及发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。`, message_id, telegramBotToken);
           }
 
           // 处理报告命令
-          if (messageText === "/report") {
+          if (userMessageText === "/report") {
             const serverTime = new Date().toISOString();
-            return sendMessage(chat_id, `\n程序名：${programName}\n版本：${Version}\n服务器时间：${serverTime}\n\n用户名：@${username}\n用户ID：${user_id}\n聊天ID：${chat_id}\n聊天类型：${chat_type}\n\n作者：molikai-work\nGitHub：https://github.com/molikai-work/QuickTranslateBot`, message_id, TELEGRAM_BOT_TOKEN);
+            return sendTelegramMessage(chatId, `程序名：${programName}\n版本：${programVersion}\n服务器时间：${serverTime}\n\n用户名：@${username}\n用户ID：${userId}\n聊天ID：${chatId}\n聊天类型：${chatType}\n\n作者：molikai-work\nGitHub：https://github.com/molikai-work/QuickTranslateBot`, message_id, telegramBotToken);
           }
 
           // 处理群组消息
-          return await handleGroupMessage(messageText, chat_id, message_id, TELEGRAM_BOT_TOKEN);
+          return await handleGroupMessageTranslation(userMessageText, chatId, message_id, telegramBotToken, reply_to_message);
         }
       }
 
@@ -93,52 +93,66 @@ async function handleTelegramUpdate(request, env) {
 
     // 处理贴纸消息
     if (message.sticker) {
-      return sendSticker(chat_id, message.sticker.file_id, message_id, TELEGRAM_BOT_TOKEN);
+      return sendTelegramSticker(chatId, message.sticker.file_id, message_id, telegramBotToken);
     }
 
     // 处理图片、视频、文件等其他媒体类型
     if (message.photo || message.document || message.video || message.audio || message.voice) {
-      return sendMessage(chat_id, "抱歉，目前我不支持处理图片、视频、音频或文件等媒体类型。只支持对文本进行翻译。", message_id, TELEGRAM_BOT_TOKEN);
+      return sendTelegramMessage(chatId, "抱歉，目前我不支持处理图片、视频、音频或文件等媒体类型。只支持对文本进行翻译。", message_id, telegramBotToken);
     }
 
     // 如果没有 text
-    if (!text) {
-      return sendSticker(chat_id, "请您发送需要翻译的文本。", message_id, TELEGRAM_BOT_TOKEN);
+    if (!messageText) {
+      return sendTelegramSticker(chatId, "请您发送需要翻译的文本。", message_id, telegramBotToken);
     }
 
     // 处理开始命令
-    if (text === "/start") {
-      return sendMessage(chat_id, `\n好！让我们开始翻译，谢谢使用 ${programName} v${Version}！\n请您直接的将要翻译的文本发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。`, message_id, TELEGRAM_BOT_TOKEN);
+    if (messageText === "/start") {
+      return sendTelegramMessage(chatId, `好！让我们开始翻译，谢谢使用 ${programName} v${programVersion}！\n请您直接的将要翻译的文本发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。`, message_id, telegramBotToken);
     }
 
     // 处理报告命令
-    if (text === "/report") {
+    if (messageText === "/report") {
       const serverTime = new Date().toISOString();
-      return sendMessage(chat_id, `\n程序名：${programName}\n版本：${Version}\n服务器时间：${serverTime}\n\n用户名：@${username}\n用户ID：${user_id}\n聊天类型：${chat_type}\n\n作者：molikai-work\nGitHub：https://github.com/molikai-work/QuickTranslateBot`, message_id, TELEGRAM_BOT_TOKEN);
+      return sendTelegramMessage(chatId, `程序名：${programName}\n版本：${programVersion}\n服务器时间：${serverTime}\n\n用户名：@${username}\n用户ID：${userId}\n聊天类型：${chatType}\n\n作者：molikai-work\nGitHub：https://github.com/molikai-work/QuickTranslateBot`, message_id, telegramBotToken);
     }
 
     // 处理翻译请求
-    const translatedText = await handleTranslation(text);
-    return sendMessage(chat_id, translatedText, message_id, TELEGRAM_BOT_TOKEN);
+    const translatedText = await fetchTranslation(messageText);
+    return sendTelegramMessage(chatId, translatedText, message_id, telegramBotToken);
   } catch (error) {
     return handleError(error);
   }
 }
 
 // 处理群组消息
-async function handleGroupMessage(text, chat_id, message_id, TELEGRAM_BOT_TOKEN) {
-  // 判断群组消息中的文本，决定是否翻译
-  const translatedText = await handleTranslation(text);
-  return sendMessage(chat_id, translatedText, message_id, TELEGRAM_BOT_TOKEN);
+async function handleGroupMessageTranslation(messageText, chatId, messageId, telegramBotToken, reply_to_message) {
+  const trimmedMessageText = messageText.trim();
+
+  // 检查是否是引用消息且提及后没有文本
+  if (reply_to_message && !trimmedMessageText) {
+    const originalMessageText = reply_to_message.text;
+    if (originalMessageText) {
+      // 对引用的消息进行翻译
+      const translatedText = await fetchTranslation(originalMessageText);
+      return sendTelegramMessage(chatId, translatedText, messageId, telegramBotToken);
+    } else {
+      return sendTelegramMessage(chatId, "抱歉，引用的消息不包含可翻译的文本。", messageId, telegramBotToken);
+    }
+  }
+
+  // 如果不是引用消息或者提及后有文本，直接处理文本翻译
+  const translatedText = await fetchTranslation(messageText);
+  return sendTelegramMessage(chatId, translatedText, messageId, telegramBotToken);
 }
 
 // 处理翻译请求
-async function handleTranslation(text) {
-  const GOOGLE_TRANSLATE_API = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=";
+async function fetchTranslation(text) {
+  const googleTranslateApiUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=";
 
   // 根据消息内容判断目标语言（如果是中文则翻译成英文，反之亦然）
-  const targetLang = /[\p{Script=Han}]/u.test(text.trim()) ? "en" : "zh-CN";
-  const translateUrl = `${GOOGLE_TRANSLATE_API}${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+  const targetLanguage = /[\p{Script=Han}]/u.test(text.trim()) ? "en" : "zh-CN";
+  const translateUrl = `${googleTranslateApiUrl}${targetLanguage}&dt=t&q=${encodeURIComponent(text)}`;
 
   const translateResponse = await fetch(translateUrl);
   if (!translateResponse.ok) throw new Error("Failed to fetch translation");
@@ -148,32 +162,32 @@ async function handleTranslation(text) {
 }
 
 // 发送文本消息
-async function sendMessage(chat_id, text, reply_to_message_id, token) {
+async function sendTelegramMessage(chatId, text, replyToMessageId, token) {
   const sendMessageUrl = `https://api.telegram.org/bot${token}/sendMessage`;
-  const responsePayload = {
-    chat_id, text,
-    reply_to_message_id,
+  const messagePayload = {
+    chat_id: chatId, text,
+    reply_to_message_id: replyToMessageId,
     disable_web_page_preview: "true",
   };
 
   await fetch(sendMessageUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(responsePayload)
+    body: JSON.stringify(messagePayload)
   });
 
   return new Response(null, { status: 200 });
 }
 
 // 发送贴纸消息
-async function sendSticker(chat_id, sticker_id, reply_to_message_id, token) {
+async function sendTelegramSticker(chatId, stickerId, replyToMessageId, token) {
   const sendStickerUrl = `https://api.telegram.org/bot${token}/sendSticker`;
-  const responsePayload = { chat_id, sticker: sticker_id, reply_to_message_id };
+  const stickerPayload = { chat_id: chatId, sticker: stickerId, reply_to_message_id: replyToMessageId };
 
   await fetch(sendStickerUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(responsePayload)
+    body: JSON.stringify(stickerPayload)
   });
 
   return new Response(null, { status: 200 });
