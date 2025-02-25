@@ -104,7 +104,7 @@ async function handleTelegramWebhook(request, env) {
 
     // 处理开始命令
     if (messageText === "/start") {
-      return sendTelegramMessage(chatId, `好！让我们开始翻译，谢谢使用 ${programName} v${programVersion}！\n请您直接的将要翻译的文本发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。\n\n您也可以使用 /to <目标语言> <文本> 命令快捷指定目标语言进行翻译。\n使用 /translate <源语言> <目标语言> <文本> 命令指定源语言与目标语言进行翻译。\n\n使用 /report 查看程序详细信息。`, message_id, telegramBotToken);
+      return sendTelegramMessage(chatId, `好！让我们开始翻译，谢谢使用 ${programName} v${programVersion}！\n请您直接的将要翻译的文本发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。\n\n您也可以使用 /to <目标语言> <文本> 命令快捷指定目标语言进行翻译。\n使用 /form <源语言> <文本> 命令快捷指定源语言翻译为简体中文。\n使用 /translate <源语言> <目标语言> <文本> 命令指定源语言与目标语言进行翻译。\n\n使用 /report 查看程序详细信息。`, message_id, telegramBotToken);
     }
 
     // 处理报告命令
