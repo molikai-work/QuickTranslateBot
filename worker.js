@@ -1,6 +1,6 @@
 // 程序基本信息
 const programName = "Quick Translate Bot";
-const programVersion = "1.1.1";
+const programVersion = "1.1.2";
 
 // 处理 HTTP 请求
 export default {
@@ -69,12 +69,7 @@ async function handleTelegramWebhook(request, env) {
 
           // 如果@后面没有文本并且不是引用，则发送提示信息
           if (!userMessageText && !reply_to_message) {
-            return sendTelegramMessage(chatId, "您好，欢迎提及！请在提及后面输入您需要翻译的文本。", message_id, telegramBotToken);
-          }
-
-          // 处理开始命令
-          if (userMessageText === "/start") {
-            return sendTelegramMessage(chatId, `好！让我们开始翻译，谢谢使用 ${programName} v${programVersion}！\n请您将要翻译的文本通过提及发送给我，目前仅支持中英互译，我会自动识别并回复翻译结果。`, message_id, telegramBotToken);
+            return sendTelegramMessage(chatId, `您好，欢迎提及 ${telegramBotUsername}！\n请在提及后面输入您需要翻译的文本。`, message_id, telegramBotToken);
           }
 
           // 处理报告命令
@@ -118,19 +113,30 @@ async function handleTelegramWebhook(request, env) {
       return sendTelegramMessage(chatId, `程序名：${programName}\n版本：${programVersion}\n服务器时间：${serverTime}\n\n用户名：@${username}\n用户ID：${userId}\n聊天类型：${chatType}\n\n作者：molikai-work\nGitHub：https://github.com/molikai-work/QuickTranslateBot`, message_id, telegramBotToken);
     }
 
+    // 处理 /from 命令
+    const fromCommandRegex = /^\/from\s+([a-zA-Z-]+)\s+([\s\S]+)/;
+    const matchTromCommand = messageText.match(fromCommandRegex);
+    if (matchTromCommand) {
+      const [_, sourceLang, userMessageText] = matchTromCommand;
+
+      // 设置目标语言为 zh-CN 并根据 sourceLang 设置源语言
+      const translatedText = await fetchTranslation(userMessageText, sourceLang, 'zh-CN');
+      return sendTelegramMessage(chatId, translatedText, message_id, telegramBotToken);
+    }
+
     // 处理 /to 命令
-    const toCommandRegex = /^\/to\s+([a-zA-Z-]+)\s+(.*)/;
+    const toCommandRegex = /^\/to\s+([a-zA-Z-]+)\s+([\s\S]+)/;
     const matchToCommand = messageText.match(toCommandRegex);
     if (matchToCommand) {
       const [_, targetLang, userMessageText] = matchToCommand;
 
-      // 设置目标语言为 userMessageText 并自动检测源语言
+      // 设置目标语言为 targetLang 并自动检测源语言
       const translatedText = await fetchTranslation(userMessageText, 'auto', targetLang);
       return sendTelegramMessage(chatId, translatedText, message_id, telegramBotToken);
     }
 
-    // 处理翻译命令
-    const translateCommandRegex = /^\/translate\s+([a-zA-Z-]+)\s+([a-zA-Z-]+)\s+(.*)/;
+    // 处理 /translate 命令
+    const translateCommandRegex = /^\/translate\s+([a-zA-Z-]+)\s+([a-zA-Z-]+)\s+([\s\S]+)/;
     const matchTranslateeCommand = messageText.match(translateCommandRegex);
     if (matchTranslateeCommand) {
       const [_, sourceLang, targetLang, userMessageText] = matchTranslateeCommand;
