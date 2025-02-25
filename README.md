@@ -1,4 +1,5 @@
 # QuickTranslateBot
+另有 [PHP 部署版](https://github.com/molikai-work/QuickTranslateBot/tree/php)
 ## 简介
 `Quick Translate Bot` 是一个基于 Cloudflare Workers 部署的 Telegram Bot 的翻译机器人，支持自动中英文互译，能够处理群组和私聊中的翻译请求。  
 用户可以通过简单的与机器人交互，机器人会根据文本自动识别语言并返回翻译结果。
